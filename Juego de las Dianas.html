@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Juego de las Dianas</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body, html {
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Press Start 2P', cursive;
+      cursor: crosshair;
+    }
+    #game {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: url('jdld_fondo.png') no-repeat center center;
+      background-size: cover;
+    }
+    #target {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      background: url('jdld_diana.png') no-repeat center;
+      background-size: contain;
+      display: none;
+      z-index: 12;
+    }
+    #timer, #startText, #gameOverText {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      font-size: 16px;
+      text-shadow: 2px 2px 2px black;
+      z-index: 10;
+    }
+    #startText {
+      top: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 1;
+      transition: opacity 1s;
+    }
+    #lifeIndicator {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 120px;
+      height: auto;
+      z-index: 10;
+    }
+    #gameOverScreen {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: black;
+      opacity: 0;
+      color: white;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      transition: opacity 2s;
+      z-index: 20;
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div id="target"></div>
+    <div id="timer">00:00</div>
+    <div id="startText">PULSA PARA EMPEZAR</div>
+    <img id="lifeIndicator" src="jdld_3vidas.png" />
+    <div id="gameOverScreen">
+      <div id="gameOverText"></div>
+    </div>
+    <audio id="bgm" src="jdld_musica.mp3" loop></audio>
+    <audio id="hitSound" src="jdld_acierto.mp3"></audio>
+    <audio id="missSound" src="jdld_fallo.mp3"></audio>
+    <audio id="deathSound" src="jdld_derrota.mp3"></audio>
+  </div>
+<script>
+  const game = document.getElementById("game");
+  const target = document.getElementById("target");
+  const timerText = document.getElementById("timer");
+  const startText = document.getElementById("startText");
+  const gameOverScreen = document.getElementById("gameOverScreen");
+  const gameOverText = document.getElementById("gameOverText");
+  const lifeIndicator = document.getElementById("lifeIndicator");
+  const bgm = document.getElementById("bgm");
+  const hitSound = document.getElementById("hitSound");
+  hitSound.volume = 0.2;
+  const missSound = document.getElementById("missSound");
+  const deathSound = document.getElementById("deathSound");
+
+  let gameStarted = false;
+  let startTime;
+  let timerInterval;
+  let spawnTimeout;
+  let difficultyInterval;
+  let lives = 3;
+  let targetDuration = 3000;
+
+  function updateTimer() {
+    const now = Date.now();
+    const diff = Math.floor((now - startTime) / 1000);
+    const minutes = String(Math.floor(diff / 60)).padStart(2, '0');
+    const seconds = String(diff % 60).padStart(2, '0');
+    timerText.textContent = `${minutes}:${seconds}`;
+  }
+
+  function updateLives() {
+    if (lives === 3) lifeIndicator.src = "jdld_3vidas.png";
+    if (lives === 2) lifeIndicator.src = "jdld_2vidas.png";
+    if (lives === 1) lifeIndicator.src = "jdld_1vida.png";
+    if (lives <= 0) gameOver();
+  }
+
+  function spawnTarget() {
+    if (!gameStarted) return;
+    clearTimeout(spawnTimeout);
+
+    const x = Math.random() * (window.innerWidth - 120);
+    const y = 50 + Math.random() * (window.innerHeight - 50 - 120);
+    target.style.left = `${x}px`;
+    target.style.top = `${y}px`;
+    target.style.display = "block";
+
+    spawnTimeout = setTimeout(() => {
+      if (target.style.display === "block") {
+        target.style.display = "none";
+        missSound.play();
+        lives--;
+        updateLives();
+        spawnTarget();
+      }
+    }, targetDuration);
+  }
+
+  function gameOver() {
+    gameStarted = false;
+    clearInterval(timerInterval);
+    clearTimeout(spawnTimeout);
+    clearInterval(difficultyInterval);
+    bgm.pause();
+    deathSound.play();
+    target.style.display = "none";
+    lifeIndicator.style.display = "none";
+    gameOverText.textContent = `HAS AGUANTADO ${timerText.textContent}`;
+    gameOverScreen.style.opacity = 1;
+  }
+
+  function startGame() {
+    console.log("startGame ejecutado");
+    gameStarted = true;
+    startText.style.opacity = 0;
+    bgm.play();
+    startTime = Date.now();
+    timerInterval = setInterval(updateTimer, 1000);
+
+    setTimeout(() => { 
+      console.log("Llamando a spawnTarget"); 
+      spawnTarget(); 
+    }, 1500);
+
+    targetDuration = 2500;
+    difficultyInterval = setInterval(() => {
+      if (targetDuration > 750) {
+        targetDuration -= 50;
+      }
+    }, 5000);
+  }
+
+  document.addEventListener("click", (e) => {
+    console.log("Click detectado");
+    if (!gameStarted) {
+      startGame();
+      return;
+    }
+
+    if (target.style.display === "block") {
+      const rect = target.getBoundingClientRect();
+      if (
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom
+      ) {
+        hitSound.play();
+        target.style.display = "none";
+        spawnTarget();
+      } else {
+        lives--;
+        missSound.play();
+        updateLives();
+      }
+    } else {
+      lives--;
+      missSound.play();
+      updateLives();
+    }
+  });
+</script>
+</body>
+</html>
